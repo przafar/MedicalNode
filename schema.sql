@@ -1,0 +1,1 @@
+INSERT INTO patients (last_name, first_name, middle_name, identifier, phone_number, url) VALUES ('Ilhomov', 'Ali', 'Akromovich', '123121231231232', '+998977654322', 'http://example.com');
