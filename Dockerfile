@@ -1,12 +1,17 @@
-FROM node:16
+# Используйте Node.js образ
+FROM node:20
 
+# Установите рабочую директорию
 WORKDIR /usr/src/app
 
+# Скопируйте package.json и package-lock.json
 COPY package*.json ./
 
+# Установите зависимости
 RUN npm install
 
+# Скопируйте все файлы в контейнер
 COPY . .
 
-EXPOSE 3000
-CMD ["npm", "run", "dev"]
+# Запустите приложение
+CMD ["npm", "start"]
