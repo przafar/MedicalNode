@@ -27,59 +27,57 @@ const getAppointments = async (req, res) => {
   const perPageInt = parseInt(per_page, 10);
   const offset = (pageInt - 1) * perPageInt;
 
-  const roleToEncounterClassMap = {
-    pediatric_therapeutic_dentistry: 'DTS',
-    surgical_dentistry: 'HS',
-    ent_specialist: 'ENT',
-    orthopedic_dentistry: 'OD',
-    therapeutic_dentistry: 'TD',
-    procedural_specialist: 'PS'
-  };
+  const fixedRoles = ['super_admin', 'owner', 'reception'];
 
   try {
     let whereClause = '';
-    let queryParams = [];  // Инициализируем параметры для запроса
+    let queryParams = [];
     let countParams = [];
 
-    // Фильтрация по patient_id
+    // Filter by patient_id if provided
     if (patient_id) {
       whereClause = 'WHERE appointments.patient_id = $1';
       queryParams = [patient_id];
       countParams = [patient_id];
     }
 
-    // Фильтр по роли, кроме super_admin, owner, reception
-    if (role !== 'super_admin' && role !== 'owner' && role !== 'reception') {
-      const encounterClass = roleToEncounterClassMap[role];
-      if (encounterClass) {
-        if (whereClause) {
-          whereClause += ` AND appointments.encounter_class = $${queryParams.length + 1}`;
-          queryParams.push(encounterClass);
-          countParams.push(encounterClass);
-        } else {
-          whereClause = 'WHERE appointments.encounter_class = $1';
-          queryParams = [encounterClass];
-          countParams = [encounterClass];
-        }
+    // If the role is not a fixed role, filter by encounter_class
+    if (!fixedRoles.includes(role)) {
+      const encounterClassResult = await pool.query('SELECT code FROM encounter_classes WHERE code = $1', [role]);
+
+      if (encounterClassResult.rows.length === 0) {
+        return res.status(400).json({ message: "Invalid role or encounter class not found." });
+      }
+
+      const encounterClass = encounterClassResult.rows[0].code;
+
+      if (whereClause) {
+        whereClause += ` AND appointments.encounter_class = $${queryParams.length + 1}`;
+        queryParams.push(encounterClass);
+        countParams.push(encounterClass);
+      } else {
+        whereClause = 'WHERE appointments.encounter_class = $1';
+        queryParams = [encounterClass];
+        countParams = [encounterClass];
       }
     }
 
-    // Добавляем параметры LIMIT и OFFSET в конец массива параметров
-    queryParams.push(perPageInt, offset);  // Добавляем пер_page и смещение для пагинации
+    // Add pagination parameters (limit and offset)
+    queryParams.push(perPageInt, offset);
 
-    // Лог финальных параметров
+    // Log final query parameters for debugging
     console.log('Final Query Params:', queryParams);
 
-    // Запрос на общее количество записей
+    // Query for the total count of records
     const totalResult = await pool.query(`SELECT COUNT(*) FROM appointments ${whereClause}`, countParams);
     const total = parseInt(totalResult.rows[0].count, 10);
     const totalPages = Math.ceil(total / perPageInt);
 
     if (pageInt > totalPages || pageInt < 1) {
-      return res.status(400).send({ error: "Неправильный номер страницы.", total_pages: totalPages });
+      return res.status(400).send({ error: "Invalid page number.", total_pages: totalPages });
     }
 
-    // Основной запрос
+    // Main query to fetch appointments with patient and encounter details
     const query = `
       SELECT 
         appointments.*, 
@@ -114,6 +112,7 @@ const getAppointments = async (req, res) => {
 
     const data = await pool.query(query, queryParams);
 
+    // Return the appointments with pagination info
     res.status(200).send({
       pagination: {
         total,
@@ -134,12 +133,14 @@ const getAppointments = async (req, res) => {
   }
 };
 
+
 // Get appointment by ID
+// Get appointment by ID (updated to include prescriptions)
 const getAppointmentById = async (req, res) => {
   const id = parseInt(req.params.id);
 
   try {
-    const result = await pool.query(`
+    const appointmentResult = await pool.query(`
       SELECT 
         appointments.*, 
         json_build_object(
@@ -178,13 +179,23 @@ const getAppointmentById = async (req, res) => {
         appointments.id = $1
     `, [id]);
 
-    if (result.rows.length === 0) {
+    if (appointmentResult.rows.length === 0) {
       return res.status(404).send({ message: "Appointment not found" });
     }
 
-    res.status(200).json(result.rows[0]);
+    // Fetch related prescriptions
+    const prescriptionResult = await pool.query(`
+      SELECT * FROM prescriptions WHERE appointment_id = $1
+    `, [id]);
+
+    const appointmentData = {
+      ...appointmentResult.rows[0],
+      prescriptions: prescriptionResult.rows,
+    };
+
+    res.status(200).json(appointmentData);
   } catch (error) {
-    console.error(error);
+    console.error("Error retrieving appointment:", error);
     res.status(500).send({ message: "Error retrieving appointment" });
   }
 };

@@ -8,13 +8,43 @@ const convertDateToISO = (date) => {
 };
 
 const getPatients = async (req, res) => {
-  const { page = 1, per_page = 10 } = req.query;
+  const { page = 1, per_page = 10, firstname, lastname, middlename, gender } = req.query;
 
   const pageInt = parseInt(page, 10);
   const perPageInt = parseInt(per_page, 10);
+  const offset = (pageInt - 1) * perPageInt;
 
   try {
-    const totalResult = await pool.query("SELECT COUNT(*) FROM patients");
+    let whereClause = [];
+    let queryParams = [];
+
+    // Add filter for firstname
+    if (firstname) {
+      whereClause.push(`first_name ILIKE $${queryParams.length + 1}`);
+      queryParams.push(`%${firstname}%`);
+    }
+
+    // Add filter for lastname
+    if (lastname) {
+      whereClause.push(`last_name ILIKE $${queryParams.length + 1}`);
+      queryParams.push(`%${lastname}%`);
+    }
+
+    // Add filter for middlename
+    if (middlename) {
+      whereClause.push(`middle_name ILIKE $${queryParams.length + 1}`);
+      queryParams.push(`%${middlename}%`);
+    }
+
+    // Add filter for gender
+    if (gender) {
+      whereClause.push(`gender = $${queryParams.length + 1}`);
+      queryParams.push(gender);
+    }
+
+    const whereSQL = whereClause.length > 0 ? `WHERE ${whereClause.join(' AND ')}` : '';
+
+    const totalResult = await pool.query(`SELECT COUNT(*) FROM patients ${whereSQL}`, queryParams);
     const total = parseInt(totalResult.rows[0].count, 10);
     const totalPages = Math.ceil(total / perPageInt);
 
@@ -25,7 +55,7 @@ const getPatients = async (req, res) => {
       });
     }
 
-    const offset = (pageInt - 1) * perPageInt;
+    queryParams.push(perPageInt, offset);
 
     const data = await pool.query(
       `SELECT 
@@ -39,9 +69,10 @@ const getPatients = async (req, res) => {
         url, 
         CONCAT(last_name, ' ', first_name, ' ', middle_name) AS full_name 
       FROM patients 
+      ${whereSQL} 
       ORDER BY id DESC 
-      LIMIT $1 OFFSET $2`,
-      [perPageInt, offset]
+      LIMIT $${queryParams.length - 1} OFFSET $${queryParams.length}`,
+      queryParams
     );
 
     const nextPage = pageInt < totalPages ? `/patients?page=${pageInt + 1}&per_page=${perPageInt}` : null;
@@ -66,6 +97,7 @@ const getPatients = async (req, res) => {
     res.status(500).send({ error: e.message });
   }
 };
+
 
 const createPatient = async (req, res) => {
   const { lastName, firstName, middleName, identifier, phoneNumber, url, birthDate, gender } = req.body;
