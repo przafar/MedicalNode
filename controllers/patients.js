@@ -43,20 +43,27 @@ const getPatients = async (req, res) => {
     const totalResult = await pool.query(`SELECT COUNT(*) FROM patients ${whereSQL}`, queryParams);
     const total = parseInt(totalResult.rows[0].count, 10);
 
-    if (total === 0) {
-      return res.status(404).send({ error: 'No patients found.' });  // Return 404 if no patients found
-    }
-
     const totalPages = Math.ceil(total / perPageInt);
     if (pageInt > totalPages || pageInt < 1) {
-      return res.status(400).send({
-        error: "Invalid page number.",
-        total_pages: totalPages,
+      return res.status(200).send({
+        pagination: {
+          total: 0,
+          count: 0,
+          per_page: perPageInt,
+          current_page: pageInt,
+          total_pages: 0,
+          links: {
+            next: null,
+            previous: null,
+          },
+        },
+        data: [],
       });
     }
 
     queryParams.push(perPageInt, offset);
 
+    // Fetch the patients
     const data = await pool.query(
       `SELECT 
         id, 
@@ -77,6 +84,23 @@ const getPatients = async (req, res) => {
 
     const nextPage = pageInt < totalPages ? `/patients?page=${pageInt + 1}&per_page=${perPageInt}` : null;
     const prevPage = pageInt > 1 ? `/patients?page=${pageInt - 1}&per_page=${perPageInt}` : null;
+
+    if (data.rowCount === 0) {
+      return res.status(200).send({
+        pagination: {
+          total,
+          count: 0,
+          per_page: perPageInt,
+          current_page: pageInt,
+          total_pages: totalPages,
+          links: {
+            next: null,
+            previous: prevPage,
+          },
+        },
+        data: [],
+      });
+    }
 
     res.status(200).send({
       pagination: {
