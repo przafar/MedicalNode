@@ -1,6 +1,5 @@
 const pool = require("../db");
 
-// Get all encounter classes
 const getEncounterClasses = async (req, res) => {
   try {
     const data = await pool.query("SELECT * FROM encounter_classes");
@@ -11,7 +10,6 @@ const getEncounterClasses = async (req, res) => {
   }
 };
 
-// Get encounter types by encounter class code
 const getEncounterTypesByClass = async (req, res) => {
   const { code } = req.params;
   try {
@@ -29,7 +27,6 @@ const getEncounterTypesByClass = async (req, res) => {
   }
 };
 
-// Create a encounter class
 const createEncounterClass = async (req, res) => {
   const { code, display } = req.body;
 
@@ -46,7 +43,6 @@ const createEncounterClass = async (req, res) => {
   }
 };
 
-// Create a encounter type
 const createEncounterType = async (req, res) => {
   const { class_code, code, display, price } = req.body;
 
@@ -73,7 +69,6 @@ const createEncounterType = async (req, res) => {
   }
 };
 
-// Update existing encounter class
 const updateEncounterClass = async (req, res) => {
   const { id } = req.params;
   const { code, display } = req.body;
@@ -97,7 +92,6 @@ const updateEncounterClass = async (req, res) => {
   }
 };
 
-// Update an existing encounter type
 const updateEncounterType = async (req, res) => {
   const { id } = req.params;
   const { code, display, price, class_id } = req.body;

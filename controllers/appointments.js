@@ -1,9 +1,8 @@
 const pool = require("../db");
 const jwt = require('jsonwebtoken');
 
-// Middleware for token authentication
 const authenticateToken = (req, res, next) => {
-  const token = req.headers['authorization']?.split(' ')[1]; // Assuming Bearer token
+  const token = req.headers['authorization']?.split(' ')[1];
 
   if (!token) {
     return res.status(401).send({ message: "Token is required" });
@@ -18,7 +17,6 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// Get all appointments with pagination
 const getAppointments = async (req, res) => {
   const { page = 1, per_page = 10, patient_id } = req.query;
   const { role } = req.user;
@@ -34,14 +32,12 @@ const getAppointments = async (req, res) => {
     let queryParams = [];
     let countParams = [];
 
-    // Filter by patient_id if provided
     if (patient_id) {
       whereClause = 'WHERE appointments.patient_id = $1';
       queryParams = [patient_id];
       countParams = [patient_id];
     }
 
-    // If the role is not a fixed role, filter by encounter_class
     if (!fixedRoles.includes(role)) {
       const encounterClassResult = await pool.query('SELECT code FROM encounter_classes WHERE code = $1', [role]);
 
@@ -62,13 +58,10 @@ const getAppointments = async (req, res) => {
       }
     }
 
-    // Add pagination parameters (limit and offset)
     queryParams.push(perPageInt, offset);
 
-    // Log final query parameters for debugging
     console.log('Final Query Params:', queryParams);
 
-    // Query for the total count of records
     const totalResult = await pool.query(`SELECT COUNT(*) FROM appointments ${whereClause}`, countParams);
     const total = parseInt(totalResult.rows[0].count, 10);
     const totalPages = Math.ceil(total / perPageInt);
@@ -77,7 +70,6 @@ const getAppointments = async (req, res) => {
       return res.status(400).send({ error: "Invalid page number.", total_pages: totalPages });
     }
 
-    // Main query to fetch appointments with patient and encounter details
     const query = `
       SELECT 
         appointments.*, 
@@ -112,7 +104,6 @@ const getAppointments = async (req, res) => {
 
     const data = await pool.query(query, queryParams);
 
-    // Return the appointments with pagination info
     res.status(200).send({
       pagination: {
         total,
@@ -134,8 +125,6 @@ const getAppointments = async (req, res) => {
 };
 
 
-// Get appointment by ID
-// Get appointment by ID (updated to include prescriptions)
 const getAppointmentById = async (req, res) => {
   const id = parseInt(req.params.id);
 
@@ -183,7 +172,6 @@ const getAppointmentById = async (req, res) => {
       return res.status(404).send({ message: "Appointment not found" });
     }
 
-    // Fetch related prescriptions
     const prescriptionResult = await pool.query(`
       SELECT * FROM prescriptions WHERE appointment_id = $1
     `, [id]);
@@ -200,10 +188,9 @@ const getAppointmentById = async (req, res) => {
   }
 };
 
-// Create a new appointment
 const createAppointment = async (req, res) => {
   const { encounter_class, encounter_types = [], reason_text, patient_id, status = 'draft' } = req.body;
-  const createdBy = req.user.id; // Assuming `req.user.id` contains the user id from the token
+  const createdBy = req.user.id;
 
   try {
     const appointmentResult = await pool.query(
@@ -250,7 +237,6 @@ const updateAppointment = async (req, res) => {
   }
 
   try {
-    // Fetch current appointment and history
     const currentAppointment = await pool.query('SELECT history FROM appointments WHERE id = $1', [id]);
     if (currentAppointment.rowCount === 0) {
       return res.status(404).send({ message: "Appointment not found" });
@@ -261,7 +247,6 @@ const updateAppointment = async (req, res) => {
       currentHistory = JSON.parse(currentHistory);
     }
 
-    // Add status update to history
     const newHistory = [...currentHistory, {
       action: 'status_updated',
       user: req.user.id,
@@ -269,7 +254,6 @@ const updateAppointment = async (req, res) => {
       status: status,
     }];
 
-    // Update the appointment in the database
     await pool.query(
       `UPDATE appointments 
       SET status = $1, reason_text = $2, updated_at = NOW(), updated_by = $3, history = $4 
@@ -277,25 +261,20 @@ const updateAppointment = async (req, res) => {
       [status, reason_text, req.user.id, JSON.stringify(newHistory), id]
     );
 
-    // If encounter_types are provided, update them
     if (encounter_types && encounter_types.length > 0) {
-      // First, fetch encounter type IDs based on the provided codes
       const encounterTypesResult = await pool.query(
         'SELECT id, code FROM encounter_types WHERE code = ANY($1::text[])',
         [encounter_types]
       );
 
-      // Check if all provided codes were found
       if (encounterTypesResult.rows.length !== encounter_types.length) {
         return res.status(400).send({ error: "Some encounter types not found" });
       }
 
       const encounterTypeIds = encounterTypesResult.rows.map(row => row.id);
 
-      // Delete existing encounter_types for the appointment
       await pool.query('DELETE FROM encounter_types_patient WHERE appointment_id = $1', [id]);
 
-      // Insert the new encounter_types using their IDs
       const values = encounterTypeIds.map((encounterTypeId, index) => `($1, $${index + 2})`).join(', ');
       const encounterTypeValues = [id, ...encounterTypeIds];
 
@@ -313,18 +292,15 @@ const updateAppointment = async (req, res) => {
 };
 
 
-// Change appointment status
 const updateAppointmentStatus = async (req, res) => {
   const id = parseInt(req.params.id);
   const { status } = req.body;
 
-  // Ensure the status is present in the request body
   if (!status) {
     return res.status(400).send({ error: "Status is required" });
   }
 
   try {
-    // Fetch current appointment and history
     const currentAppointment = await pool.query('SELECT history FROM appointments WHERE id = $1', [id]);
     if (currentAppointment.rowCount === 0) {
       return res.status(404).send({ message: "Appointment not found" });
@@ -332,12 +308,10 @@ const updateAppointmentStatus = async (req, res) => {
 
     let currentHistory = currentAppointment.rows[0].history;
 
-    // If the history is stored as a string, ensure we parse it; otherwise, it's already an object
     if (typeof currentHistory === 'string') {
       currentHistory = JSON.parse(currentHistory);
     }
 
-    // Add status update to history
     const newHistory = [...currentHistory, {
       action: 'status_updated',
       user: req.user.id,
@@ -345,7 +319,6 @@ const updateAppointmentStatus = async (req, res) => {
       status: status,
     }];
 
-    // Update only the status in the database
     await pool.query(
       `UPDATE appointments 
       SET status = $1, updated_at = NOW(), updated_by = $2, history = $3 
@@ -362,7 +335,6 @@ const updateAppointmentStatus = async (req, res) => {
 
 
 
-// Delete an appointment
 const deleteAppointment = async (req, res) => {
   const id = parseInt(req.params.id);
 

@@ -18,36 +18,36 @@ const getPatients = async (req, res) => {
     let whereClause = [];
     let queryParams = [];
 
-    // Add filter for firstname
-    if (firstname) {
+    if (firstname && firstname.trim()) {
       whereClause.push(`first_name ILIKE $${queryParams.length + 1}`);
-      queryParams.push(`%${firstname}%`);
+      queryParams.push(`%${firstname.trim()}%`);
     }
 
-    // Add filter for lastname
-    if (lastname) {
+    if (lastname && lastname.trim()) {
       whereClause.push(`last_name ILIKE $${queryParams.length + 1}`);
-      queryParams.push(`%${lastname}%`);
+      queryParams.push(`%${lastname.trim()}%`);
     }
 
-    // Add filter for middlename
-    if (middlename) {
+    if (middlename && middlename.trim()) {
       whereClause.push(`middle_name ILIKE $${queryParams.length + 1}`);
-      queryParams.push(`%${middlename}%`);
+      queryParams.push(`%${middlename.trim()}%`);
     }
 
-    // Add filter for gender
-    if (gender) {
+    if (gender && gender.trim()) {
       whereClause.push(`gender = $${queryParams.length + 1}`);
-      queryParams.push(gender);
+      queryParams.push(gender.trim());
     }
 
     const whereSQL = whereClause.length > 0 ? `WHERE ${whereClause.join(' AND ')}` : '';
 
     const totalResult = await pool.query(`SELECT COUNT(*) FROM patients ${whereSQL}`, queryParams);
     const total = parseInt(totalResult.rows[0].count, 10);
-    const totalPages = Math.ceil(total / perPageInt);
 
+    if (total === 0) {
+      return res.status(404).send({ error: 'No patients found.' });  // Return 404 if no patients found
+    }
+
+    const totalPages = Math.ceil(total / perPageInt);
     if (pageInt > totalPages || pageInt < 1) {
       return res.status(400).send({
         error: "Invalid page number.",
@@ -102,7 +102,6 @@ const getPatients = async (req, res) => {
 const createPatient = async (req, res) => {
   const { lastName, firstName, middleName, identifier, phoneNumber, url, birthDate, gender } = req.body;
 
-  // Ensure birthDate is in the correct ISO format
   const formattedBirthDate = moment(birthDate).format('YYYY-MM-DD');
 
   const genderId = gender.toLowerCase() === 'male' ? 1 : 2;
@@ -130,15 +129,12 @@ const updatePatient = async (req, res) => {
 
   const formattedBirthDate = birthDate ? moment(birthDate).format('YYYY-MM-DD') : null;
 
-  // Map gender to ID if provided
   const genderId = gender ? (gender.toLowerCase() === 'male' ? 1 : 2) : null;
 
   try {
-    // Initialize dynamic query components
     const fields = [];
     const values = [];
 
-    // Dynamically build the query components
     if (lastName) {
       fields.push("last_name = $" + (fields.length + 1));
       values.push(lastName);
@@ -172,11 +168,9 @@ const updatePatient = async (req, res) => {
       values.push(genderId);
     }
 
-    // Ensure there are fields to update
     if (fields.length > 0) {
-      // Construct the dynamic SQL query
       const setClause = fields.join(', ');
-      values.push(id); // Append the ID at the end of the values array
+      values.push(id);
 
       await pool.query(
         `UPDATE patients SET ${setClause} WHERE id = $${fields.length + 1}`,

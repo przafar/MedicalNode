@@ -1,9 +1,8 @@
 const pool = require("../db");
 const jwt = require('jsonwebtoken');
 
-// Middleware for token authentication
 const authenticateToken = (req, res, next) => {
-  const token = req.headers['authorization']?.split(' ')[1]; // Assuming Bearer token
+  const token = req.headers['authorization']?.split(' ')[1];
 
   if (!token) {
     return res.status(401).send({ message: "Token is required" });
@@ -18,7 +17,6 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// Get all prescriptions with pagination
 const getPrescriptions = async (req, res) => {
   const { page = 1, per_page = 10, appointment_id } = req.query;
 
@@ -30,13 +28,11 @@ const getPrescriptions = async (req, res) => {
     let whereClause = '';
     let queryParams = [];
 
-    // Add filtering by appointment_id if provided
     if (appointment_id) {
       whereClause = 'WHERE prescriptions.appointment_id = $1';
-      queryParams.push(appointment_id); // Only add appointment_id to the parameters if it exists
+      queryParams.push(appointment_id);
     }
 
-    // Total count query: only add params if appointment_id exists
     const countQuery = `SELECT COUNT(*) FROM prescriptions ${whereClause}`;
     const countParams = appointment_id ? [appointment_id] : [];
     const totalResult = await pool.query(countQuery, countParams);
@@ -47,7 +43,6 @@ const getPrescriptions = async (req, res) => {
       return res.status(400).send({ error: "Invalid page number.", total_pages: totalPages });
     }
 
-    // Data query: add pagination parameters
     const dataQuery = `
       SELECT prescriptions.*, appointments.id AS appointment_id
       FROM prescriptions
@@ -56,7 +51,7 @@ const getPrescriptions = async (req, res) => {
       ORDER BY prescriptions.id DESC
       LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
 
-    queryParams.push(perPageInt, offset); // Pagination parameters added after filtering params
+    queryParams.push(perPageInt, offset);
 
     const data = await pool.query(dataQuery, queryParams);
 
@@ -80,7 +75,6 @@ const getPrescriptions = async (req, res) => {
   }
 };
 
-// Get prescription by ID
 const getPrescriptionById = async (req, res) => {
   const id = parseInt(req.params.id);
 
@@ -101,10 +95,9 @@ const getPrescriptionById = async (req, res) => {
   }
 };
 
-// Create a new prescription
 const createPrescription = async (req, res) => {
   const { appointment_id, prescribing_doctor, medications, notes } = req.body;
-  const { id: createdBy } = req.user; // Assuming token contains user id
+  const { id: createdBy } = req.user;
 
   try {
     const result = await pool.query(
@@ -121,7 +114,6 @@ const createPrescription = async (req, res) => {
   }
 };
 
-// Update prescription
 const updatePrescription = async (req, res) => {
   const id = parseInt(req.params.id);
   const { medications, notes, printed_status } = req.body;
@@ -145,7 +137,6 @@ const updatePrescription = async (req, res) => {
   }
 };
 
-// Delete a prescription
 const deletePrescription = async (req, res) => {
   const id = parseInt(req.params.id);
 
