@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Шаблон рецепта</title>
+  <style>
+      body {
+          font-family: Arial, sans-serif;
+      }
+      .prescription {
+          width: 210mm; /* Ширина A4 */
+          margin: 10mm auto; /* Отступы для соответствия формату A4 */
+          background-color: #fff;
+          padding: 20mm; /* Добавляем отступы для лучшей читаемости */
+          border-radius: 10px;
+      }
+      .header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+      }
+      .header .logo {
+          width: 35mm;
+          height: 35mm;
+          background-image: url('http://45.130.148.94/assets/dentalor-min-ae7c278a.png');
+          background-size: cover;
+      }
+      .header .doctor-info {
+          text-align: right;
+      }
+      .doctor-info h1 {
+          margin: 0;
+          color: #2a4d69;
+      }
+      .doctor-info h2 {
+          margin: 0;
+          color: #6397b8;
+          font-size: 14px;
+      }
+      .patient-info, .diagnosis-info {
+          display: flex;
+          justify-content: space-between;
+          margin: 20px 0;
+      }
+      .patient-info div, .diagnosis-info div {
+          width: 48%;
+      }
+      .rx {
+          margin-top: 50px;
+          font-size: 40px;
+          color: #2a4d69;
+      }
+      .details {
+          margin-top: 30px;
+          font-size: 16px;
+          line-height: 1.8;
+      }
+      .details p {
+          margin: 0;
+          font-size: 18px;
+      }
+      .medication-list {
+          margin-top: 20px;
+      }
+      table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 10px;
+      }
+      table, th, td {
+          border: 1px solid black;
+      }
+      th, td {
+          padding: 8px;
+          text-align: left;
+      }
+      th {
+          background-color: #f2f2f2;
+      }
+      .signature {
+          margin-top: 50px;
+          text-align: right;
+          font-size: 16px;
+      }
+      .signature img {
+          width: 50mm;
+          height: 50mm;
+          margin-top: 20px;
+      }
+      .footer {
+          display: flex;
+          justify-content: flex-end;
+          margin-top: 50px;
+          border-top: 1px solid #000;
+          padding-top: 20px;
+      }
+      .footer .qr-code {
+          display: none; /* Убираем QR-код из футера, если не требуется дублирование */
+      }
+      .footer .contact-info {
+          text-align: right;
+          font-size: 12px;
+      }
+      .footer .contact-info p {
+          margin: 0;
+      }
+
+      @media print {
+          body {
+              background-color: #fff;
+          }
+          .prescription {
+              box-shadow: none;
+          }
+      }
+  </style>
+</head>
+<body>
+
+<div class="prescription">
+  <div class="header">
+    <div class="logo"></div>
+    <div class="doctor-info">
+      <h1>{{doctorName}}</h1>
+      <h2>{{doctorSpecialty}}</h2>
+    </div>
+  </div>
+
+  <div class="patient-info">
+    <div>
+      <p><strong>Имя пациента:</strong> {{patientName}}</p>
+      <p><strong>Дата:</strong> {{date}}</p>
+    </div>
+    <div>
+      <p><strong>Дата рождения:</strong> {{birthDate}}</p>
+    </div>
+  </div>
+
+  <div class="rx">
+    Рецепт
+  </div>
+
+<!--  <div class="details">-->
+<!--    <p><strong>Ташхис:</strong> {{diagnosis}}</p>-->
+<!--    <p><strong>Лечащий врач:</strong> {{attendingDoctor}}</p>-->
+<!--  </div>-->
+
+  <div class="medication-list">
+    <h3>Лекарства:</h3>
+
+    <table>
+      <thead>
+      <tr>
+        <th>Название лекарства</th>
+        <th>Дозировка</th>
+        <th>Продолжительность</th>
+        <th>Частота</th>
+      </tr>
+      </thead>
+      <tbody>
+      {{medications}}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="details">
+    <p><strong>Заметки:</strong> {{notes}}</p>
+    <p><strong>Дата выписки:</strong> {{dischargeDate}}</p>
+  </div>
+
+  <div class="signature">
+    <img src="file:///<absolute_path_to>/QRcode.png" alt="QR код">
+  </div>
+
+  <div class="footer">
+    <div class="contact-info">
+      <p>+998 90 610 31 03</p>
+      <p>www.dentalor.uz</p>
+      <p>dentalor@mail.com</p>
+      <p>Ташкент, Яшнабадский район, Тузельский массив, 1-й квартал, 49</p>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

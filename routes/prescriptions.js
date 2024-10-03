@@ -13,4 +13,6 @@ router.put('/:id', authenticateToken, prescriptionController.updatePrescription)
 
 router.delete('/:id', authenticateToken, prescriptionController.deletePrescription);
 
+router.get('/:id/pdf', authenticateToken, prescriptionController.generatePrescriptionPDF)
+
 module.exports = router;

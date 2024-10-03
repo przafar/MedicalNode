@@ -1,5 +1,8 @@
 const pool = require("../db");
 const jwt = require('jsonwebtoken');
+const puppeteer = require('puppeteer');
+const path = require('path');
+const fs = require('fs');
 
 const authenticateToken = (req, res, next) => {
   const token = req.headers['authorization']?.split(' ')[1];
@@ -154,11 +157,97 @@ const deletePrescription = async (req, res) => {
   }
 };
 
+const replaceTemplateVariables = (template, data, appointment_info) => {
+  return template
+    .replace('{{doctorName}}', data.prescribing_doctor)
+    .replace('{{doctorSpecialty}}', appointment_info.encounter_class_display || 'Стоматолог')
+    .replace('{{patientName}}', appointment_info.patient_name)
+    .replace('{{date}}', new Date(data.created_at).toLocaleDateString())
+    .replace('{{birthDate}}', new Date(appointment_info.patient_birth_date).toLocaleDateString() || '_________________________')
+    .replace('{{notes}}', data.notes || '_________________________')
+    .replace('{{dischargeDate}}', new Date(appointment_info.updated_at).toLocaleString() || '_________________________')
+    .replace('{{medications}}', data.medications.map(med => `
+      <tr>
+        <td>${med.name}</td>
+        <td>${med.dosage}</td>
+        <td>${med.duration}</td>
+        <td>${med.frequency}</td>
+      </tr>
+    `).join(''));
+};
+
+const generatePrescriptionPDF = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const prescriptionResult = await pool.query('SELECT * FROM prescriptions WHERE id = $1', [id]);
+    if (prescriptionResult.rows.length === 0) {
+      return res.status(404).send({ message: "Prescription not found" });
+    }
+
+    const prescription = prescriptionResult.rows[0];
+
+    if (typeof prescription.medications === 'string') {
+      prescription.medications = JSON.parse(prescription.medications);
+    }
+
+    const appointmentResult = await pool.query(
+      `SELECT 
+        appointments.*, 
+        CONCAT(patients.last_name, ' ', patients.first_name, ' ', patients.middle_name) AS patient_name,
+        patients.birth_date AS patient_birth_date,
+        encounter_classes.display AS encounter_class_display,
+        encounter_types.display AS encounter_type_display
+      FROM appointments 
+      JOIN patients ON appointments.patient_id = patients.id
+      LEFT JOIN encounter_classes ON appointments.encounter_class = encounter_classes.code
+      LEFT JOIN encounter_types ON appointments.encounter_type = encounter_types.code
+      WHERE appointments.id = $1`,
+      [prescription.appointment_id]
+    );
+
+    if (appointmentResult.rows.length === 0) {
+      return res.status(404).send({ message: "Appointment not found" });
+    }
+
+    const appointment_info = appointmentResult.rows[0];
+
+    const templatePath = path.join(__dirname, '../templates/prescriptionTemplate.html');
+    let htmlTemplate = fs.readFileSync(templatePath, 'utf8');
+
+    htmlTemplate = replaceTemplateVariables(htmlTemplate, prescription, appointment_info);
+
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+    const page = await browser.newPage();
+
+    await page.setContent(htmlTemplate, { waitUntil: 'networkidle0' });
+
+    const pdf = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+    });
+
+    await browser.close();
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=prescription-${prescription.id}.pdf`);
+    res.end(pdf);
+  } catch (error) {
+    console.error("Error generating prescription PDF:", error);
+    res.status(500).send({ error: error.message });
+  }
+};
+
+
 module.exports = {
   getPrescriptions,
   getPrescriptionById,
   createPrescription,
   updatePrescription,
   deletePrescription,
-  authenticateToken
+  authenticateToken,
+  generatePrescriptionPDF
 };
